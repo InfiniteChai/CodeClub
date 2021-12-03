@@ -5,6 +5,7 @@ from typing import Optional
 from ipycanvas import Canvas
 from ipywidgets import Image
 
+from codeclub.puzzle.animals import Crocodile
 from codeclub.puzzle.gameboard import Component, GameBoard, CellCorner, Monkey
 
 
@@ -46,6 +47,9 @@ class Car(Component):
                     position = (position[0], position[1]+1)
                     path.append(position)
                     continue
+                if isinstance(below, Crocodile) and not below.mouth_closed:
+                    result = False
+                    break
 
             right = self.game_board[(position[0]+1, position[1])]
             # We've reached the target

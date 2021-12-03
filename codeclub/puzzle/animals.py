@@ -77,6 +77,107 @@ class Snake(Component):
             raise Exception(f"Cannot set snake length to {value} as will hit cell {cells[0]}")
 
 
+class Crocodile(Component):
+    def __init__(self, x: int, y: int, open: bool = False):
+        self.x = x
+        self.y = y
+        self._open = open
+        self.game_board: Optional[GameBoard] = None
+
+    @property
+    def mouth_closed(self) -> bool:
+        return not self._open
+
+    def toggle(self):
+        self._open = not self._open
+        self.set_gameboard(self.game_board)
+        self.game_board.draw()
+
+    def set_gameboard(self, board: GameBoard):
+        self.game_board = board
+        cells = [(self.x, self.y), (self.x+1, self.y)]
+        if self._open:
+            cells.append((self.x, self.y-1))
+        board.set_cells(tuple(cells), self)
+
+    def draw(self, board: GameBoard, canvas: Canvas):
+        image = self.open_canvas if self._open else self.close_canvas
+        canvas.draw_image(image, *board.coordinates(self.x, self.y-0.5, corner=CellCorner.TOP_LEFT))
+
+    @classmethod
+    @property
+    @functools.lru_cache(maxsize=None)
+    def open_canvas(cls):
+        sprite = Image.from_file(os.path.join(os.path.dirname(__file__), "images/croc_open.png"))
+        canvas = Canvas(height=120 * 11, width=240)
+        canvas.draw_image(sprite, 0, 0)
+        return canvas
+
+    @classmethod
+    @property
+    @functools.lru_cache(maxsize=None)
+    def close_canvas(cls):
+        sprite = Image.from_file(os.path.join(os.path.dirname(__file__), "images/croc_close.png"))
+        canvas = Canvas(height=120 * 11, width=240)
+        canvas.draw_image(sprite, 0, 0)
+        return canvas
+
+
+class Well(Component):
+    def __init__(self, x: int, y: int, level: int = 1, max_level: int = 1):
+        self.x = x
+        self.y = y
+        self._level = level
+        self.crocodile = Crocodile(x, y + 1 - level, open=False)
+        self.max_level = max_level
+        self.game_board: Optional[GameBoard] = None
+
+    @property
+    def water_level(self) -> int:
+        return self._level
+
+    def fill(self):
+        if self._level >= self.max_level:
+            raise Exception("The well is already full!")
+        t1 = 0.25
+        l0 = self._level
+        def animation_step(t):
+            self._level = (l0*(t1-t) + (l0+1)*t)/t1
+            self.crocodile.y = self.y + 1 - self._level
+
+        self.game_board.animate(t1, animation_step)
+        self.crocodile.y = self.y - l0
+        self._level = l0 + 1
+        self.crocodile.set_gameboard(self.game_board)
+
+    def empty(self):
+        t1 = (self._level - 1 ) * 0.25
+        l0 = self._level
+
+        def animation_step(t):
+            self._level = (l0 * (t1 - t) + t) / t1
+            self.crocodile.y = self.y + 1 - self._level
+        if l0 != 1:
+            self.game_board.animate(t1, animation_step)
+        self.crocodile.y = self.y + 1
+        self._level = 1
+        self.crocodile.set_gameboard(self.game_board)
+
+    def set_gameboard(self, board: GameBoard):
+        board.add_component(self.crocodile, draw=True)
+        #board.components[-2] = self.crocodile
+        #board.components[-1] = self
+
+        self.game_board = board
+
+    def draw(self, board: GameBoard, canvas: Canvas):
+        canvas.save()
+        canvas.fill_style = "#5c78e4"
+        canvas.global_alpha = 0.2
+        canvas.fill_rect(*board.coordinates(self.x, self.y-self._level, corner=CellCorner.BOTTOM_LEFT), width=board.pixels(2), height=board.pixels(self._level))
+        canvas.restore()
+
+
 class Giraffe(Component):
     def __init__(self, x: int, y: int, height: int = 2):
         self.x = x
